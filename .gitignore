@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Models and Vector DB (Large Files)
+models/
+chroma_db/
+
+# Data and SQLite
+*.db
+*.db-journal
+*.jsonl
+
+# Environment and IDE
+.venv/
+env/
+.env
+.vscode/
+.idea/
