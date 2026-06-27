@@ -1,14 +1,17 @@
-import sqlite3
+import sqlalchemy
+from sqlalchemy import text
 from llama_cpp import Llama
 from local_rag_schema_manager import SchemaRAG
 
 # Main SQL Agent class. 
 # It handles the LLM calls and has a basic self-correction loop if the SQL is junk.
 class IndustrialSQLAgent:
-    def __init__(self, model_path, db_path="fineract.db"):
+    def __init__(self, model_path, db_uri="sqlite:///fineract.db"):
         # Load up the GGUF model. Make sure you have enough RAM!
         self.llm = Llama(model_path=model_path, n_ctx=4096, n_threads=8)
-        self.db_path = db_path
+        self.db_uri = db_uri
+        self.engine = sqlalchemy.create_engine(db_uri)
+        self.dialect = self.engine.name # e.g., 'sqlite', 'mysql', 'postgresql'
         self.rag = SchemaRAG()
 
     def generate_sql(self, question, context_packet, error_msg=None):
@@ -21,7 +24,7 @@ Relevant Tables:
 {context_packet['schema_details']}
 
 Rules:
-1. Use SQLite syntax.
+1. Use {self.dialect.upper()} syntax.
 2. Return ONLY the SQL query inside ```sql blocks.
 3. If I provide an error, fix your previous logic.
 """
@@ -42,7 +45,6 @@ Rules:
 
     def run_query(self, question, context_packet, max_retries=3, on_status=None):
         # on_status is a callback so the UI can show what's happening in real time
-        # e.g. on_status("Attempt 2: fixing column name error...")
         error_msg = None
         last_sql = ""
 
@@ -60,23 +62,23 @@ Rules:
                 on_status(f"SQL: `{last_sql[:100]}{'...' if len(last_sql) > 100 else ''}`")
 
             try:
-                conn = sqlite3.connect(self.db_path)
-                conn.row_factory = sqlite3.Row
-                cursor = conn.cursor()
-                cursor.execute(last_sql)
-                results = cursor.fetchall()
-                conn.close()
-
+                with self.engine.connect() as conn:
+                    result_proxy = conn.execute(text(last_sql))
+                    # SQLAlchemy returns Row objects which act like tuples, 
+                    # we use mapping() to get dictionary-like behavior
+                    results = [dict(row._mapping) for row in result_proxy]
+                
                 # Query ran fine - return success with whatever data we got (could be empty)
                 return {
                     "status": "success",
-                    "data": [dict(row) for row in results],
+                    "data": results,
                     "sql": last_sql,
                     "attempts": attempt + 1
                 }
 
-            except sqlite3.Error as e:
-                error_msg = str(e)
+            except sqlalchemy.exc.SQLAlchemyError as e:
+                # Get the actual string error from the driver
+                error_msg = str(e.__dict__.get('orig', e))
                 if on_status:
                     on_status(f"Error: {error_msg}")
                 print(f"--- Attempt {attempt + 1} failed: {error_msg} ---")

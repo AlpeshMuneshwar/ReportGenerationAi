@@ -33,7 +33,7 @@ with st.sidebar:
     
     software_mode = st.selectbox("Market Software", ["Apache Fineract", "Mifos X", "Custom SQL ERP"])
     model_path = st.text_input("GGUF Model Path", "models/Qwen2.5-3B-Instruct.Q4_K_M.gguf")
-    db_path = st.text_input("Local SQLite DB", "fineract.db")
+    db_uri = st.text_input("Database URI", "sqlite:///fineract.db")
     
     st.info("Status: 100% Local / Zero-Trust")
     if st.button("Nuke & Rebuild RAG"):
@@ -79,7 +79,7 @@ if run_btn and user_query:
                 st.code(context_packet['schema_details'])
             
             st.write("Step 4: Activating SQL Generation Engine (Qwen-2.5 3B)...")
-            agent = IndustrialSQLAgent(model_path, db_path)
+            agent = IndustrialSQLAgent(model_path, db_uri=db_uri)
             
             try:
                 st.write("Step 5: Generating and executing SQL...")
