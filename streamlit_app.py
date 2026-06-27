@@ -21,9 +21,9 @@ st.markdown("""
 
 # Grab RAG engine from session if it exists, otherwise spin up a new one
 if 'rag' not in st.session_state:
-    with st.spinner("📡 Booting up RAG Engine... hang tight"):
+    with st.spinner("Booting up RAG Engine... hang tight"):
         st.session_state.rag = SchemaRAG()
-        st.success("✅ Ready to query")
+        st.success("Ready to query")
 
 # Sidebar for Configuration
 with st.sidebar:
@@ -35,14 +35,14 @@ with st.sidebar:
     model_path = st.text_input("GGUF Model Path", "models/Qwen2.5-3B-Instruct.Q4_K_M.gguf")
     db_path = st.text_input("Local SQLite DB", "fineract.db")
     
-    st.info("Status: 🟢 100% Local / Zero-Trust")
-    if st.button("🔄 Nuke & Rebuild RAG"):
-        with st.status("🏗️ Re-indexing everything...", expanded=True) as s:
+    st.info("Status: 100% Local / Zero-Trust")
+    if st.button("Nuke & Rebuild RAG"):
+        with st.status("Re-indexing everything...", expanded=True) as s:
             st.write("Wiping cache...")
             st.session_state.rag = SchemaRAG()
             st.write("Reading Fineract knowledge base...")
             # TODO: Add a check here to ensure PDF/Docs are also scanned
-            s.update(label="✅ All set!", state="complete")
+            s.update(label="All set!", state="complete")
 
 # Header
 st.title("🏦 Industrial AI Report Generator")
@@ -63,14 +63,14 @@ if run_btn and user_query:
     if not os.path.exists(model_path):
         st.error(f"Model not found at {model_path}. Please download your GGUF file from Colab.")
     else:
-        with st.status("🛠️ Industrial AI Workflow Engine...", expanded=True) as status:
-            st.write("📂 Step 1: Querying Knowledge Base for domain rules...")
+        with st.status("Industrial AI Workflow Engine...", expanded=True) as status:
+            st.write("Step 1: Querying Knowledge Base for domain rules...")
             context_packet = st.session_state.rag.retrieve_advanced_context(software_mode, user_query)
             
-            st.write("🔍 Step 2: Cross-referencing Domain Knowledge with SQL Schema...")
+            st.write("Step 2: Cross-referencing Domain Knowledge with SQL Schema...")
             tables = context_packet['table_names']
             
-            st.write(f"✅ Step 3: Relevant tables identified: `{', '.join(tables)}`")
+            st.write(f"Step 3: Relevant tables identified: `{', '.join(tables)}`")
             
             with st.expander("View AI Knowledge Context"):
                 st.markdown("**Domain Knowledge Applied:**")
@@ -78,11 +78,11 @@ if run_btn and user_query:
                 st.markdown("**Relevant Schema Snippets:**")
                 st.code(context_packet['schema_details'])
             
-            st.write("🧠 Step 4: Activating SQL Generation Engine (Qwen-2.5 3B)...")
+            st.write("Step 4: Activating SQL Generation Engine (Qwen-2.5 3B)...")
             agent = IndustrialSQLAgent(model_path, db_path)
             
             try:
-                st.write("🚀 Step 5: Generating and executing SQL...")
+                st.write("Step 5: Generating and executing SQL...")
                 
                 # The callback pipes retry info directly into this status widget
                 result = agent.run_query(
@@ -97,17 +97,17 @@ if run_btn and user_query:
                 
                 # --- Case 1: SQL worked AND we got rows back ---
                 if result['status'] == 'success' and len(result['data']) > 0:
-                    st.write("✨ Step 6: Post-processing results for visualization...")
+                    st.write("Step 6: Post-processing results for visualization...")
                     df = pd.DataFrame(result['data'])
                     st.session_state.df = df
-                    status.update(label=f"✅ Analysis Complete! ({result['attempts']} attempt{'s' if result['attempts'] > 1 else ''})", state="complete", expanded=False)
+                    status.update(label=f"Analysis Complete! ({result['attempts']} attempt{'s' if result['attempts'] > 1 else ''})", state="complete", expanded=False)
                 
                 # --- Case 2: SQL worked but returned 0 rows (e.g. "Mr Y" doesn't exist) ---
                 elif result['status'] == 'success' and len(result['data']) == 0:
                     st.info("ℹ️ Query executed successfully but returned **no matching records**. The data you're looking for may not exist in the database.")
                     if 'df' in st.session_state:
                         del st.session_state.df
-                    status.update(label="⚠️ No Matching Records Found", state="complete")
+                    status.update(label="No Matching Records Found", state="complete")
                 
                 # --- Case 3: SQL generation failed after all retries ---
                 else:
@@ -115,7 +115,7 @@ if run_btn and user_query:
                     st.warning(f"Last error from SQLite: `{result.get('error', 'Unknown')}`")
                     if 'df' in st.session_state:
                         del st.session_state.df
-                    status.update(label="❌ Query Generation Failed", state="error")
+                    status.update(label="Query Generation Failed", state="error")
                     
             except Exception as e:
                 st.error(f"Inference Error: {e}")

@@ -49,15 +49,15 @@ Rules:
         for attempt in range(max_retries):
             if on_status:
                 if attempt == 0:
-                    on_status(f"🚀 Generating SQL (attempt {attempt + 1}/{max_retries})...")
+                    on_status(f"Generating SQL (attempt {attempt + 1}/{max_retries})...")
                 else:
-                    on_status(f"🔧 Self-correcting SQL (attempt {attempt + 1}/{max_retries})...")
+                    on_status(f"Self-correcting SQL (attempt {attempt + 1}/{max_retries})...")
 
             raw_response = self.generate_sql(question, context_packet, error_msg)
             last_sql = self._extract_sql(raw_response)
 
             if on_status:
-                on_status(f"📝 SQL: `{last_sql[:100]}{'...' if len(last_sql) > 100 else ''}`")
+                on_status(f"SQL: `{last_sql[:100]}{'...' if len(last_sql) > 100 else ''}`")
 
             try:
                 conn = sqlite3.connect(self.db_path)
@@ -78,7 +78,7 @@ Rules:
             except sqlite3.Error as e:
                 error_msg = str(e)
                 if on_status:
-                    on_status(f"⚠️ Error: {error_msg}")
+                    on_status(f"Error: {error_msg}")
                 print(f"--- Attempt {attempt + 1} failed: {error_msg} ---")
 
         # Exhausted all retries — SQL generation is fundamentally broken for this query

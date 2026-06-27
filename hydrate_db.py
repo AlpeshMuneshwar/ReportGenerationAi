@@ -9,12 +9,12 @@ def hydrate():
     if os.path.exists(db_path):
         os.remove(db_path)
         
-    print(f"🏗️  Creating fresh DB at {db_path}...")
+    print(f"Creating fresh DB at {db_path}...")
     conn = sqlite3.connect(db_path)
     
     # 1. Create the core tables
     # Just the essentials for now to prove the RAG works
-    print("📋 Setting up m_office, m_client, and m_savings_account...")
+    print("Setting up m_office, m_client, and m_savings_account...")
     conn.executescript("""
     CREATE TABLE m_office (
         id INTEGER PRIMARY KEY,
@@ -42,7 +42,7 @@ def hydrate():
 
     # 2. Seed some test data so the user isn't looking at an empty screen
     # Adding the 'Mr X' user as requested
-    print("🧪 Seeding test records...")
+    print("Seeding test records...")
     conn.execute("INSERT INTO m_office VALUES (1, 'Head Office', 'HO-001')")
     
     clients = [
@@ -62,7 +62,7 @@ def hydrate():
     
     conn.commit()
     conn.close()
-    print("✅ Hydration complete.")
+    print("Hydration complete.")
 
 if __name__ == "__main__":
     hydrate()
