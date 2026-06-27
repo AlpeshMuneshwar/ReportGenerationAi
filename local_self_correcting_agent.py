@@ -40,33 +40,55 @@ Rules:
         output = self.llm(prompt, max_tokens=512, stop=["###", "<|im_end|>"])
         return output['choices'][0]['text'].strip()
 
-    def run_query(self, question, context_packet, max_retries=3):
-        # We try a few times if the LLM spits out bad SQL
+    def run_query(self, question, context_packet, max_retries=3, on_status=None):
+        # on_status is a callback so the UI can show what's happening in real time
+        # e.g. on_status("Attempt 2: fixing column name error...")
         error_msg = None
+        last_sql = ""
+
         for attempt in range(max_retries):
+            if on_status:
+                if attempt == 0:
+                    on_status(f"🚀 Generating SQL (attempt {attempt + 1}/{max_retries})...")
+                else:
+                    on_status(f"🔧 Self-correcting SQL (attempt {attempt + 1}/{max_retries})...")
+
             raw_response = self.generate_sql(question, context_packet, error_msg)
-            sql = self._extract_sql(raw_response)
-            
+            last_sql = self._extract_sql(raw_response)
+
+            if on_status:
+                on_status(f"📝 SQL: `{last_sql[:100]}{'...' if len(last_sql) > 100 else ''}`")
+
             try:
-                # Standard SQLite connection
                 conn = sqlite3.connect(self.db_path)
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
-                cursor.execute(sql)
+                cursor.execute(last_sql)
                 results = cursor.fetchall()
                 conn.close()
-                
-                # Convert to list of dicts for easier use in Streamlit/Pandas
-                return [dict(row) for row in results]
-                
+
+                # Query ran fine - return success with whatever data we got (could be empty)
+                return {
+                    "status": "success",
+                    "data": [dict(row) for row in results],
+                    "sql": last_sql,
+                    "attempts": attempt + 1
+                }
+
             except sqlite3.Error as e:
                 error_msg = str(e)
-                print(f"--- Correction Loop: Attempt {attempt + 1} failed ---")
-                print(f"Error: {error_msg}")
-                # The next iteration will include this error_msg in the prompt
-        
-        # If we're here, we failed 3 times. Return None so the UI knows.
-        return None
+                if on_status:
+                    on_status(f"⚠️ Error: {error_msg}")
+                print(f"--- Attempt {attempt + 1} failed: {error_msg} ---")
+
+        # Exhausted all retries — SQL generation is fundamentally broken for this query
+        return {
+            "status": "failed",
+            "data": None,
+            "sql": last_sql,
+            "error": error_msg,
+            "attempts": max_retries
+        }
 
     def _extract_sql(self, text):
         # Human-written helper to pull SQL out of markdown blocks

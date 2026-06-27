@@ -82,19 +82,41 @@ if run_btn and user_query:
             agent = IndustrialSQLAgent(model_path, db_path)
             
             try:
-                st.write("🚀 Step 5: Generating and executing MySQL logic...")
-                results = agent.run_query(user_query)
+                st.write("🚀 Step 5: Generating and executing SQL...")
                 
-                if isinstance(results, list) and len(results) > 0:
+                # The callback pipes retry info directly into this status widget
+                result = agent.run_query(
+                    user_query, 
+                    context_packet, 
+                    on_status=lambda msg: st.write(msg)
+                )
+                
+                # Show the final SQL that was used
+                with st.expander(f"View Generated SQL ({result['attempts']} attempt{'s' if result['attempts'] > 1 else ''})"):
+                    st.code(result.get('sql', 'N/A'), language='sql')
+                
+                # --- Case 1: SQL worked AND we got rows back ---
+                if result['status'] == 'success' and len(result['data']) > 0:
                     st.write("✨ Step 6: Post-processing results for visualization...")
-                    df = pd.DataFrame(results)
+                    df = pd.DataFrame(result['data'])
                     st.session_state.df = df
-                    status.update(label="✅ Analysis Complete!", state="complete", expanded=False)
-                else:
-                    st.info("ℹ️ No records found in the database matching your specific query criteria.")
+                    status.update(label=f"✅ Analysis Complete! ({result['attempts']} attempt{'s' if result['attempts'] > 1 else ''})", state="complete", expanded=False)
+                
+                # --- Case 2: SQL worked but returned 0 rows (e.g. "Mr Y" doesn't exist) ---
+                elif result['status'] == 'success' and len(result['data']) == 0:
+                    st.info("ℹ️ Query executed successfully but returned **no matching records**. The data you're looking for may not exist in the database.")
                     if 'df' in st.session_state:
                         del st.session_state.df
-                    status.update(label="⚠️ Query Execution Finished (No Data)", state="complete")
+                    status.update(label="⚠️ No Matching Records Found", state="complete")
+                
+                # --- Case 3: SQL generation failed after all retries ---
+                else:
+                    st.error(f"❌ SQL generation failed after **{result['attempts']} attempts**. The model couldn't produce a valid query for this input.")
+                    st.warning(f"Last error from SQLite: `{result.get('error', 'Unknown')}`")
+                    if 'df' in st.session_state:
+                        del st.session_state.df
+                    status.update(label="❌ Query Generation Failed", state="error")
+                    
             except Exception as e:
                 st.error(f"Inference Error: {e}")
 
